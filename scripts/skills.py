@@ -93,14 +93,10 @@ def get_pick_plan(mgc_arm, graspit_interface_grasp_msg, grasp_frame_id):
     return success, result
 
 
-def send_pick_request(pickup_goal):
-    allowed_planning_time = rospy.get_param('reachability_analyzer/allowed_planning_time') + 3
-
+def send_pick_request(pickup_goal, allowed_planning_time):
     pick_plan_client = actionlib.SimpleActionClient('/pickup', moveit_msgs.msg.PickupAction)
     pick_plan_client.wait_for_server(rospy.Duration(3))
 
-    success = False
-    received_result = False
     pick_plan_client.send_goal(pickup_goal)
 
     received_result = pick_plan_client.wait_for_result(rospy.Duration(allowed_planning_time))
@@ -118,30 +114,16 @@ def send_pick_request(pickup_goal):
     return success, result
 
 
-def execute_pickup_plan(mgc_arm, mgc_gripper, pick_plan, object_name):
+def pick(self, object_name, pick_plan, scene):
+    grasp = pick_plan.grasp
+    moveit_grasps = [grasp]
 
-    # pick_plan.trajectory_descriptions
-    # ['plan', 'pre_grasp', 'approach', 'grasp', 'retreat']
+    success, pick_result = self.pickplace.pick_with_retry(
+        object_name,
+        moveit_grasps,
+        # support_name='table',
+        retries=1,
+        scene=scene)
 
-    for i in range(5):
-
-        if i % 2 == 0:
-            success = mgc_arm.execute(pick_plan.trajectory_stages[i])
-        elif i == 3:
-            success = mgc_gripper.execute(pick_plan.trajectory_stages[i])
-            # close_gripper()
-            # starting_jv = mgc_gripper.get_current_joint_values()
-            # for x in range(3):
-            #     success = mgc_gripper.execute(pick_plan.trajectory_stages[i])
-            #     jv = mgc_gripper.get_current_joint_values()
-            #     if not np.allclose(jv, starting_jv):
-            #         break
-
-        else:
-            success = mgc_gripper.execute(pick_plan.trajectory_stages[i])
-
-        if not success:
-            # if a stage of the trajectory is not successful
-            break
-        rospy.sleep(1)
+    self.pick_result = pick_result
     return success
